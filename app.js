@@ -63,38 +63,45 @@ app.post('/', (req, res) => {
 		res.render('dashboard')
 	}
 
-	client.hget('users', username, (err, userId) => {
-		console.log('users from hget', username, userId)
-		if(!userId) {
-			// signup
-			client.incr('userId', async (err, userId) => {
-				// create new user - signup
-				client.hset('users', username, userId)
+	const handleSignUp = (username, password) => {
+		client.incr('userId', async (err, userId) => {
+			// create new user
+			client.hset('users', username, userId)
 
-				// hash password
-				const saltRounds = 10
-				const hash = await bcrypt.hash(password, saltRounds)
-
-			console.log(`user:${userId}`, username, hash);
+			// hash password
+			const saltRounds = 10
+			const hash = await bcrypt.hash(password, saltRounds)
 
 			client.hmset(`user:${userId}`, 'hash', hash, 'username', username)
+
 			saveSessionAndRenderDashboard(userId)
-			})
+		})
+	}
+
+	const handleLogin = (userId, password) => {
+		client.hget(`user:${userId}`, 'hash', async (err, hash) => {
+			const result = await bcrypt.compare(password, hash)
+
+			if(result) {
+				// password ok
+				saveSessionAndRenderDashboard(userId)
+			} else {
+				// wrong password
+				res.render('error', {
+					message: 'Incorrect Password'
+				})
+				return
+			}
+		})
+	}
+
+	client.hget('users', username, (err, userId) => {
+		if(!userId) {
+			// signup
+			handleSignUp(username, password)
 		} else {
 			// login
-			client.hget(`user:${userId}`, 'hash', async (err, hash) => {
-				const result = await bcrypt.compare(password, hash)
-				if(result) {
-					// password ok
-					saveSessionAndRenderDashboard(userId)
-				} else {
-					// wrong password
-					res.render('error', {
-						message: 'Incorrect password',
-					});
-					return;
-				}
-			})
+			handleLogin(userId, password)
 		}
 	})
 })

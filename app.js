@@ -44,7 +44,7 @@ app.get('/', (req, res) => {
 	}
 })
 
-// receive login and password
+// Signup & Login 
 app.post('/', (req, res) => {
   const { username, password } = req.body
   
@@ -103,6 +103,33 @@ app.post('/', (req, res) => {
 			// login
 			handleLogin(userId, password)
 		}
+	})
+})
+
+// Post Message
+
+app.get('/post', (req, res) => {
+	if(req.session.userId) {
+		res.render('post')
+	} else {
+		res.render('login')
+	}
+})
+
+app.post('/post', (req, res) => {
+	// check if user logged in
+	if(!req.session.userId) {
+		res.render('login')
+		return
+	}
+
+	const { message } = req.body
+
+	client.incr('postId', async (err, postId) => {
+		// store userId, message & timestamp in created post
+		client.hmset(`post:${postId}`, 'userId', req.session.userId, 'message', message, 'timestamp', Date.now())
+
+		res.render('dashboard')
 	})
 })
 

@@ -1,11 +1,9 @@
-html
-  head
-    link(rel='stylesheet', href='https://cdn.jsdelivr.net/npm/@tailwindcss/ui@latest/dist/tailwind-ui.min.css')
-body 
-    div.min-h-screen.bg-gray-50.flex.flex-col.justify-center.py-12(class='sm:px-6 lg:px-8')
-      div(class='sm:mx-auto sm:w-full sm:max-w-md')
-        h2.mt-6.text-center.text-3xl.leading-9.font-extrabold.text-gray-900
-          | Sign in to Flipper
+extends layout.pug
+
+block body
+    div(class='sm:mx-auto sm:w-full sm:max-w-md')
+      h2.mt-6.text-center.text-3xl.leading-9.font-extrabold.text-gray-900
+        | Sign in to Flipper
       div.mt-8(class='sm:mx-auto sm:w-full sm:max-w-md')
         .bg-white.py-8.px-4.shadow(class='sm:rounded-lg sm:px-10')
           form(action='#' method='POST')

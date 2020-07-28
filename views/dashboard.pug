@@ -7,3 +7,12 @@ block body
           | Welcome
         a.mt-6.text-center.text-1xl.leading-9.font-extrabold.text-blue-500.block(href='/post')
           | Post a message
+        h3.mt-6.text-center.text-xl.leading-9.font-extrabold.text-gray-900
+          | Follow someone new
+        ul.mt-6
+          each user in users
+            li.text-center.text-xl.leading-9.font-extrabold.text-gray-600
+              form(action='/follow' method='POST')
+                input(type='hidden' name='username' value=user)
+                button.inline-flex.justify-center.py-2.px-4.border.border-transparent.text-sm.leading-5.font-medium.rounded-md.text-white.bg-blue-600.transition.duration-150.ease-in-out(type='submit', class='hover:bg-blue-500 focus:outline-none focus:border-blue-700 focus:shadow-outline-blue active:bg-blue-700')
+                  =user

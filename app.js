@@ -38,7 +38,15 @@ app.use(
 
 app.get('/', (req, res) => {
 	if(req.session.userId) {
-		res.render('dashboard')
+		client.hget(`user:${req.session.userId}`, 'username', (err, currentUserName) => {
+			client.smembers(`following:${currentUserName}`, (err, following) => {
+				client.hkeys('users', (err, users) => {
+					res.render('dashboard', {
+						users: users.filter((user) => user !== currentUserName && following.indexOf(user) === -1)
+					})
+				})
+			})
+		})
 	} else {
 		res.render('login')
 	}
@@ -60,7 +68,10 @@ app.post('/', (req, res) => {
 	const saveSessionAndRenderDashboard = userId => {
 		req.session.userId = userId
 		req.session.save()
-		res.render('dashboard')
+		client.hkeys('users', (err, users) => {
+			console.log(users)
+			res.render('dashboard', { users })
+		})
 	}
 
 	const handleSignUp = (username, password) => {
@@ -127,10 +138,38 @@ app.post('/post', (req, res) => {
 
 	client.incr('postId', async (err, postId) => {
 		// store userId, message & timestamp in created post
+				console.log(
+					`post:${postId}`,
+					'userId',
+					req.session.userId,
+					'message',
+					message,
+					'timestamp',
+					Date.now()
+				);
+
 		client.hmset(`post:${postId}`, 'userId', req.session.userId, 'message', message, 'timestamp', Date.now())
 
-		res.render('dashboard')
+		res.redirect('/')
 	})
+})
+
+// Track following & followers
+
+app.post('/follow', (req, res) => {
+	if(!req.session.userId) {
+		res.render('login')
+		return
+	}
+
+	const { username } = req.body
+
+	client.hget(`user:${req.session.userId}`, 'username', (err, currentUserName) => {
+		client.sadd( `following:${currentUserName}`, username)
+		client.sadd( `followers:${username}`, currentUserName)
+	})
+
+	res.redirect('/')
 })
 
 app.listen(port, () => console.log(`App listening on port ${port}!`))

@@ -3,6 +3,7 @@ const redis = require('redis')
 const bcrypt = require('bcrypt')
 const session = require('express-session')
 const path = require('path')
+const { promisify } = require('util')
 
 require('dotenv').config();
 let secret = process.env.SESSION_SECRET
@@ -36,19 +37,24 @@ app.use(
 	})
 );
 
-app.get('/', (req, res) => {
-	console.log(`req.session from app.get: ${req.session.userId}`)
+// util.promisify functions
+const ahget = promisify(client.hget).bind(client)
+const asmembers = promisify(client.smembers).bind(client)
+const ahkeys = promisify(client.hkeys).bind(client)
+const aincr = promisify(client.incr).bind(client)
+const alrange = promisify(client.lrange).bind(client)
+
+
+// ROUTES
+
+app.get('/', async (req, res) => {
 	if(req.session.userId) {
-		client.hget(`user:${req.session.userId}`, 'username', (err, currentUserName) => {
-			client.smembers(`following:${currentUserName}`, (err, following) => {
-				// console.log(`following: ${currentUserName}`)
-				client.hkeys('users', (err, users) => {
-					// console.log(`users: ${users}`)
-					res.render('dashboard', {
-						users: users.filter((user) => user !== currentUserName && following.indexOf(user) === -1)
-					})
-				})
-			})
+		const currentUserName = await ahget(`user:${req.session.userId}`, 'username')
+		const following = await asmembers(`following:${currentUserName}`)
+		const users = await ahkeys('users')
+
+		res.render('dashboard', {
+			users: users.filter((user) => user !== currentUserName && following.indexOf(user) === -1)
 		})
 	} else {
 		res.render('login')

@@ -37,10 +37,13 @@ app.use(
 );
 
 app.get('/', (req, res) => {
+	console.log(`req.session from app.get: ${req.session.userId}`)
 	if(req.session.userId) {
 		client.hget(`user:${req.session.userId}`, 'username', (err, currentUserName) => {
 			client.smembers(`following:${currentUserName}`, (err, following) => {
+				// console.log(`following: ${currentUserName}`)
 				client.hkeys('users', (err, users) => {
+					// console.log(`users: ${users}`)
 					res.render('dashboard', {
 						users: users.filter((user) => user !== currentUserName && following.indexOf(user) === -1)
 					})
@@ -69,8 +72,8 @@ app.post('/', (req, res) => {
 		req.session.userId = userId
 		req.session.save()
 		client.hkeys('users', (err, users) => {
-			console.log(users)
-			res.render('dashboard', { users })
+			// console.log(users)
+			res.redirect('/')
 		})
 	}
 
@@ -138,16 +141,6 @@ app.post('/post', (req, res) => {
 
 	client.incr('postId', async (err, postId) => {
 		// store userId, message & timestamp in created post
-				console.log(
-					`post:${postId}`,
-					'userId',
-					req.session.userId,
-					'message',
-					message,
-					'timestamp',
-					Date.now()
-				);
-
 		client.hmset(`post:${postId}`, 'userId', req.session.userId, 'message', message, 'timestamp', Date.now())
 
 		res.redirect('/')
@@ -165,8 +158,8 @@ app.post('/follow', (req, res) => {
 	const { username } = req.body
 
 	client.hget(`user:${req.session.userId}`, 'username', (err, currentUserName) => {
-		client.sadd( `following:${currentUserName}`, username)
-		client.sadd( `followers:${username}`, currentUserName)
+		client.sadd(`following:${currentUserName}`, username)
+		client.sadd(`followers:${username}`, currentUserName)
 	})
 
 	res.redirect('/')

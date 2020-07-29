@@ -1,12 +1,30 @@
 extends layout.pug
 
 block body
-    .max-w-md.w-full
-      div
-        h2.mt-6.text-center.text-3xl.leading-9.font-extrabold.text-gray-900
-          | Welcome
-        a.mt-6.text-center.text-1xl.leading-9.font-extrabold.text-blue-500.block(href='/post')
-          | Post a message
+  .max-w-md.w-full
+    div
+      h2.mt-6.text-center.text-3xl.leading-9.font-extrabold.text-gray-900
+        | Welcome, #{currentUserName}!
+      a.mt-6.text-center.text-1xl.leading-9.font-extrabold.text-blue-500.block(href='/post')
+        | Post a message
+      if timeline.length > 0
+        h3.mt-6.text-center.text-xl.leading-9.font-extrabold.text-gray-900.pb-10
+          | Latest posts
+        .flex.flex-col
+          .-my-2.py-2.overflow-x-auto(class='sm:-mx-6 sm:px-6 lg:-mx-8 lg:px-8')
+            div(class='sm:rounded-lg')
+              table.min-w-full
+                tbody.bg-white
+                  each message in timeline
+
+                    tr
+                      td.px-6.py-4.whitespace-no-wrap.border-b.border-gray-200.text-sm.leading-5.font-medium.text-gray-900
+                        =message.message
+                        p.pt-3.whitespace-no-wrap.text-xs.leading-5.text-gray-500
+                          | #{message.author}, #{message.timeString} ago
+
+
+      if users.length > 0
         h3.mt-6.text-center.text-xl.leading-9.font-extrabold.text-gray-900
           | Follow someone new
         ul.mt-6

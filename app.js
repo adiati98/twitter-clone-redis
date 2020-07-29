@@ -4,6 +4,7 @@ const bcrypt = require('bcrypt')
 const session = require('express-session')
 const path = require('path')
 const { promisify } = require('util')
+const { formatDistance } = require('date-fns')
 
 require('dotenv').config();
 let secret = process.env.SESSION_SECRET
@@ -47,14 +48,37 @@ const alrange = promisify(client.lrange).bind(client)
 
 // ROUTES
 
+// Homepage
 app.get('/', async (req, res) => {
 	if(req.session.userId) {
 		const currentUserName = await ahget(`user:${req.session.userId}`, 'username')
 		const following = await asmembers(`following:${currentUserName}`)
 		const users = await ahkeys('users')
 
+		const timeline = []
+		const posts = await alrange(`timeline:${currentUserName}`, 0, 100)
+
+		console.log(`timeline: ${timeline}`);
+
+		// timeline handling
+		for (post of posts) {
+      const timestamp = await ahget(`post:${post}`, 'timestamp')
+      const timeString = formatDistance(
+        new Date(),
+        new Date(parseInt(timestamp))
+      )
+
+			timeline.push({
+				message: await ahget(`post:${post}`, 'message'),
+				author: await ahget(`post:${post}`, 'username'),
+				timeString: timeString,
+			})		
+		}
+
 		res.render('dashboard', {
-			users: users.filter((user) => user !== currentUserName && following.indexOf(user) === -1)
+			users: users.filter((user) => user !== currentUserName && following.indexOf(user) === -1),
+			currentUserName,
+			timeline
 		})
 	} else {
 		res.render('login')
@@ -126,7 +150,7 @@ app.post('/', (req, res) => {
 	})
 })
 
-// Post Message
+// Handling Post Message
 
 app.get('/post', (req, res) => {
 	if(req.session.userId) {
@@ -136,8 +160,7 @@ app.get('/post', (req, res) => {
 	}
 })
 
-app.post('/post', (req, res) => {
-	// check if user logged in
+app.post('/post', async (req, res) => {
 	if(!req.session.userId) {
 		res.render('login')
 		return
@@ -145,12 +168,30 @@ app.post('/post', (req, res) => {
 
 	const { message } = req.body
 
-	client.incr('postId', async (err, postId) => {
-		// store userId, message & timestamp in created post
-		client.hmset(`post:${postId}`, 'userId', req.session.userId, 'message', message, 'timestamp', Date.now())
+	const currentUserName = await ahget(`user:${req.session.userId}`, 'username')
+	const postId = await aincr('postId')
 
-		res.redirect('/')
-	})
+	client.hmset(`post:${postId}`, 'userId', req.session.userId, 'message', message, 'timestamp', Date.now())
+	client.lpush(`timeline:${currentUserName}`, postId)
+
+	console.log(`post:${postId}`,
+		'userId',
+		req.session.userId,
+		'message',
+		message,
+		'timestamp',
+		Date.now());
+
+	const followers = await asmembers(`followers:${currentUserName}`)
+	console.log(`followers = ${followers}`)
+
+	for (follower of followers) {
+		client.lpush(`timeline:${follower}`, postId)
+	}
+
+	console.log(`timeline:${follower}`, postId);
+
+	res.redirect('/')
 })
 
 // Track following & followers

@@ -80,6 +80,7 @@ app.get('/', async (req, res) => {
 			currentUserName,
 			timeline
 		})
+		console.log(timeline);
 	} else {
 		res.render('login')
 	}
@@ -171,12 +172,14 @@ app.post('/post', async (req, res) => {
 	const currentUserName = await ahget(`user:${req.session.userId}`, 'username')
 	const postId = await aincr('postId')
 
-	client.hmset(`post:${postId}`, 'userId', req.session.userId, 'message', message, 'timestamp', Date.now())
+	client.hmset(`post:${postId}`, 'userId', req.session.userId, 'username', username, 'message', message, 'timestamp', Date.now())
 	client.lpush(`timeline:${currentUserName}`, postId)
 
 	console.log(`post:${postId}`,
 		'userId',
 		req.session.userId,
+		'usename',
+		username,
 		'message',
 		message,
 		'timestamp',

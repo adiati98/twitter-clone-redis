@@ -10,9 +10,11 @@ require('dotenv').config();
 let secret = process.env.SESSION_SECRET
 
 const app = express()
+const port = process.env.port || 3000;
+
+// Connect to Redis 
 const RedisStore = require('connect-redis')(session)
 const client = redis.createClient()
-const port = process.env.port || 3000
 
 client.on('connect', () => {
 	console.log('Connected to Redis...')
@@ -72,7 +74,7 @@ app.get('/', async (req, res) => {
 				message: await ahget(`post:${post}`, 'message'),
 				author: await ahget(`post:${post}`, 'username'),
 				timeString: timeString,
-			})		
+			});		
 		}
 
 		res.render('dashboard', {
@@ -84,6 +86,80 @@ app.get('/', async (req, res) => {
 	} else {
 		res.render('login')
 	}
+})
+
+// Handling Post Message
+
+app.get('/post', (req, res) => {
+	if(req.session.userId) {
+		res.render('post')
+	} else {
+		res.render('login')
+	}
+})
+
+app.post('/post', async (req, res) => {
+	if(!req.session.userId) {
+		res.render('login')
+		return
+	}
+
+	const { message } = req.body
+
+	const currentUserName = await ahget(`user:${req.session.userId}`, 'username')
+	const postId = await aincr('postId')
+
+	client.hmset(
+		`post:${postId}`,
+		'userId',
+		req.session.userId,
+		'username',
+		currentUserName,
+		'message',
+		message,
+		'timestamp',
+		Date.now()
+	);
+	client.lpush(`timeline:${currentUserName}`, postId)
+
+	console.log(`post:${postId}`,
+		'userId',
+		req.session.userId,
+		'username',
+		currentUserName,
+		'message',
+		message,
+		'timestamp',
+		Date.now());
+
+	const followers = await asmembers(`followers:${currentUserName}`)
+	console.log(`followers = ${followers}`)
+
+	for (follower of followers) {
+		client.lpush(`timeline:${follower}`, postId)
+	}
+
+	console.log(`timeline:${follower}`, postId);
+
+	res.redirect('/')
+})
+
+// Track following & followers
+
+app.post('/follow', (req, res) => {
+	if(!req.session.userId) {
+		res.render('login')
+		return
+	}
+
+	const { username } = req.body
+
+	client.hget(`user:${req.session.userId}`, 'username', (err, currentUserName) => {
+		client.sadd(`following:${currentUserName}`, username)
+		client.sadd(`followers:${username}`, currentUserName)
+	})
+
+	res.redirect('/')
 })
 
 // Signup & Login 
@@ -102,10 +178,7 @@ app.post('/', (req, res) => {
 	const saveSessionAndRenderDashboard = userId => {
 		req.session.userId = userId
 		req.session.save()
-		client.hkeys('users', (err, users) => {
-			// console.log(users)
-			res.redirect('/')
-		})
+		res.redirect('/')
 	}
 
 	const handleSignUp = (username, password) => {
@@ -151,68 +224,6 @@ app.post('/', (req, res) => {
 	})
 })
 
-// Handling Post Message
 
-app.get('/post', (req, res) => {
-	if(req.session.userId) {
-		res.render('post')
-	} else {
-		res.render('login')
-	}
-})
-
-app.post('/post', async (req, res) => {
-	if(!req.session.userId) {
-		res.render('login')
-		return
-	}
-
-	const { message } = req.body
-
-	const currentUserName = await ahget(`user:${req.session.userId}`, 'username')
-	const postId = await aincr('postId')
-
-	client.hmset(`post:${postId}`, 'userId', req.session.userId, 'username', username, 'message', message, 'timestamp', Date.now())
-	client.lpush(`timeline:${currentUserName}`, postId)
-
-	console.log(`post:${postId}`,
-		'userId',
-		req.session.userId,
-		'usename',
-		username,
-		'message',
-		message,
-		'timestamp',
-		Date.now());
-
-	const followers = await asmembers(`followers:${currentUserName}`)
-	console.log(`followers = ${followers}`)
-
-	for (follower of followers) {
-		client.lpush(`timeline:${follower}`, postId)
-	}
-
-	console.log(`timeline:${follower}`, postId);
-
-	res.redirect('/')
-})
-
-// Track following & followers
-
-app.post('/follow', (req, res) => {
-	if(!req.session.userId) {
-		res.render('login')
-		return
-	}
-
-	const { username } = req.body
-
-	client.hget(`user:${req.session.userId}`, 'username', (err, currentUserName) => {
-		client.sadd(`following:${currentUserName}`, username)
-		client.sadd(`followers:${username}`, currentUserName)
-	})
-
-	res.redirect('/')
-})
 
 app.listen(port, () => console.log(`App listening on port ${port}!`))
